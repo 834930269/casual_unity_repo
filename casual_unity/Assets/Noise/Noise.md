@@ -214,3 +214,168 @@ fixed4 frag(v2f pixel) : SV_Target
 	return fixed4(col,1.0f);
 }
 ```
+
+
+# 代码解析
+
+`PerlinWorleyNoiseGenerator3D.cginc`
+
+> 哈希函数写的3D WhiteNoise (哈希函数)
+
+```
+float WhiteNoise3D(int seed,int i,int j,int k){
+    float r = frac(cos(44.54f * k + 232.02f * sin(dot(float2(i,cos(j)),float2(float(seed) + 12.9898,float(seed)+78.233))) * 45.5453));
+    return r;
+}
+```
+
+> HashVoxel (通过白噪声计算格点,*2-1是将格点映射到[-1,1]范围内)
+
+```
+float HashVoxel(int seed,int3 voxelIdx){
+    float r = WhiteNoise3D(seed,voxelIdx.x,voxelIdx.y,voxelIdx.z);
+    r = r*2.0f-1.0f;//[-1,1]
+    return r;
+}
+```
+
+> ComputeGradient(计算格点上的梯度值,这里就是随机三个格点上的值,然后归一化)
+
+```
+float3 ComputeGradient(int seed,int3 voxelIdx){
+    float3 gradient = float3(
+        HashVoxel(seed * 123+345,voxelIdx),
+        HashVoxel(seed * 456 + 234,voxelIdx),
+        HashVoxel(seed * 789 +123, voxelIdx));
+    return normalize(gradient);
+}
+```
+
+> SmoothLerp(平滑差值,上面有说)
+
+```
+float SmoothLerp(float min,float max,float t){
+    t=t*t*t*(t*(t*6.0f-15.0f) + 10.0f);
+    return min + t * (max-min);
+}
+```
+
+
+> 计算3D的柏林噪声
+
+```
+float PerlinNoise3D(int seed,float3 p,float voxelSize){
+    //voxelSize(方块的大小)
+    p /= voxelSize;
+    int3 voxelIdx = floor(p);
+    float dp[8]; //<dist_vec,gradient> 的点积
+    for(int i=0;i<8;++i){
+        int3 currentVoxelIdx = (voxelIdx + voxelVertexIdx[i]);
+        //计算随机梯度
+        float3 gradient = ComputeGradient(seed,currentVoxelIdx);
+        //计算真实顶点的coord
+        float3 vertex_coord = float3(currentVoxelIdx);
+        dp[i] = dot((p-vertex_coord),gradient);
+    }
+    
+    //tri-linear 插值
+    float3 v00 = voxelIdx;
+    float3 t = (p-v00);
+
+    //float res = SmoothLerp(SmoothLerp(dp00,dp10,tx),SmoothLerp(dp01,dp11,tx),ty);
+    //float res = lerp(lerp(lerp(dp[0],dp[4],t.x),lerp(dp[1],dp[5],t.x),t.z),lerp...)
+    float res = SmoothLerp(SmoothLerp(SmoothLerp(dp[0],dp[4],t.x),SmoothLerp(dp[1],dp[5],t.x),t.z),SmoothLerp(SmoothLerp(dp[2],dp[6],t.x),SmoothLerp(dp[3],dp[7],t.x),t.z),t.y);
+    return res;
+}
+
+```
+
+
+> 添加FBM_6(分型布朗运动(湍流))细化影响
+
+```
+//Perlin Noise with Fractal Brownian Motion
+float PerlinNoise3D_FBM6(int seed,float3 p,float voxelSize){
+    //some rotation matrix
+    float3x3 mat = {
+        0.8f,0.6f,0,
+        -0.6f,0.8f,0,
+        0,0,1.0f
+    };
+    float f = 0.0f;
+    int numFbmSteps = 6;
+    float multiplier[6] = {2.02f,2.03f,2.01f,2.04f,2.01f,2.02f};
+    float amp = 1.0f;
+    for(int i=0;i<numFbmSteps;++i){
+        f+=amp * PerlinNoise3D(seed,p,voxelSize);
+        p = mul(mat,p) * multiplier[i]; //2.0f
+        amp *=0.5f;
+    }
+    return f;
+}
+```
+
+
+## Shader 层
+
+> Shader负责将时间作为变量传递过来,影响变化
+
+```
+Shader "Unlit/PerlinNoiseSliceAnim"
+{
+    Properties
+    {
+        _MainTex ("Texture", 2D) = "white" {}
+    }
+    SubShader
+    {
+        Tags { "RenderType"="Opaque" }
+        LOD 100
+
+        Pass
+        {
+            CGPROGRAM
+            #pragma vertex vert
+            #pragma fragment frag
+            // make fog work
+            #pragma multi_compile_fog
+
+            #include "UnityCG.cginc"
+            #include "../cg/PerlinWorleyNoiseGenerator3D.cginc"
+
+            struct appdata
+            {
+                float4 vertex : POSITION;
+                float2 uv : TEXCOORD0;
+            };
+
+            struct v2f
+            {
+                float2 uv : TEXCOORD0;
+                float4 vertex : SV_POSITION;
+            };
+
+            sampler2D _MainTex;
+            float4 _MainTex_ST;
+
+            v2f vert (appdata v)
+            {
+                v2f o;
+                o.vertex = UnityObjectToClipPos(v.vertex);
+                o.uv = v.uv;
+                return o;
+            }
+
+            fixed4 frag(v2f pixel) : SV_Target
+            {
+                //a moving rect intersects with 3D perlin noise
+                float3 col = PerlinNoise3D_FBM6(123,float3(pixel.uv,_Time.x),0.3f);
+                return fixed4(col,1.0f);
+            }
+            ENDCG
+        }
+    }
+}
+
+```
+
