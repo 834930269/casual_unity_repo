@@ -7,11 +7,11 @@ Material:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: VolumetrixCloud
-  m_Shader: {fileID: 4800000, guid: 9a185cedaea95254ab08668804c4ad62, type: 3}
+  m_Name: Custom_My_Toon
+  m_Shader: {fileID: 4800000, guid: e4101c72ce7213b4ea60428654f17d55, type: 3}
   m_ShaderKeywords: 
   m_LightmapFlags: 4
-  m_EnableInstancingVariants: 1
+  m_EnableInstancingVariants: 0
   m_DoubleSidedGI: 0
   m_CustomRenderQueue: -1
   stringTagMap: {}
@@ -19,16 +19,12 @@ Material:
   m_SavedProperties:
     serializedVersion: 3
     m_TexEnvs:
-    - _3DNoise:
-        m_Texture: {fileID: 11700000, guid: 4ed99a7ccafd728408a1bd580f472384, type: 2}
+    - _MainTex:
+        m_Texture: {fileID: 0}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     m_Floats:
-    - _AlphaClipThreshold: 0
-    - _BackSssStrength: 2.65
-    - _Height: 1
-    - _Intensity: 0.65
-    - _NoiseScale: 0.1
-    - _Speed: 1
+    - _RampSmooth: 0
+    - _RampThreshold: 3
     m_Colors:
-    - _Color: {r: 0.691, g: 0.87531585, b: 1, a: 1}
+    - _Color: {r: 1, g: 1, b: 1, a: 1}

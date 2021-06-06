@@ -108,7 +108,7 @@
                 half finalLit = saturate(smoothNdotL * 0.5 + saturate(smoothNdotL + backSSS) * (1 - NdotL * 0.5));
                
 
-                return (_Color +(finalLit))* _Intensity;
+                return (_Color)* _Intensity;
             }
             ENDCG
         }
